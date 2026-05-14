@@ -22,9 +22,9 @@
 
 ## 界面预览
 
-| 管理面板 | 账号管理 | 转存整理 |
+| 首页 | 账号管理 | 日志 |
 |:---:|:---:|:---:|
-| ![管理面板](screenshots/1.png) | ![账号管理](screenshots/2.png) | ![转存整理](screenshots/3.png) |
+| ![首页](screenshots/1.png) | ![账号管理](screenshots/2.png) | ![日志](screenshots/3.png) |
 
 ---
 
