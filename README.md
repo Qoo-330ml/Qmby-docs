@@ -1,5 +1,7 @@
 # Qmby
 
+[![Docker Hub](https://img.shields.io/badge/Docker_Hub-pdzhou/qmby-2496ED?logo=docker&logoColor=white)](https://hub.docker.com/r/pdzhou/qmby)
+
 基于 Caddy 的 115 网盘视频流播放解决方案，支持 Emby/Jellyfin 集成、strm 文件生成、网盘文件自动整理、本地文件上传至 115 及多账号负载均衡。
 
 ---
@@ -27,6 +29,12 @@
 - （可选）一台 **Emby 服务器**
 
 ### Docker 部署
+
+镜像地址：[pdzhou/qmby](https://hub.docker.com/r/pdzhou/qmby)
+
+```bash
+docker pull pdzhou/qmby
+```
 
 创建 `docker-compose.yml`：
 
