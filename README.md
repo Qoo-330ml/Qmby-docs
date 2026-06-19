@@ -104,13 +104,6 @@ docker compose up -d
 - 方式二（手动）：登录 115 网页版，F12 → Network → 复制 Cookie，粘贴到输入框
 - 支持自动签到，可配置多个 Cookie 实现请求负载均衡
 
-**115 开放平台登录（推荐）：**
-- 用于上传、下载、用户信息查询等高频操作
-- 通过 115 App 扫码完成 OAuth 授权
-- Token 自动刷新与持久化，无需手动续期
-
-两种方式可同时配置，系统会根据操作类型自动选择最优驱动。
-
 ### 2. 配置 Emby 服务器
 
 在管理面板 → **系统配置** 中填写：
@@ -148,115 +141,6 @@ Caddy 视频流服务运行在 2083 端口，strm 文件中的播放地址会自
 
 ---
 
-## 目录挂载说明
-
-容器内数据目录结构：
-
-| 容器路径 | 用途 | 说明 |
-| --- | --- | --- |
-| `/data/config/` | 配置文件 | config.yaml、Caddyfile、数据库 |
-| `/data/strm/` | Strm 文件输出 | 每个任务一个子目录 |
-| `/data/log/` | 访问日志 | Caddy 访问日志 |
-| `/data/upload/` | 本地上传目录 | 文件监控的上传源目录 |
-
-默认一个 `./data:/data` 统一挂载所有目录。若需要将 strm 或 upload 单独映射到其他位置：
-
-```yaml
-volumes:
-  - ./data:/data
-  - /自定义路径/strm:/data/strm
-  - /自定义路径/upload:/data/upload
-```
-
----
-
-## 配置文件参考
-
-`data/config/config.yaml`（首次启动自动从模板创建）：
-
-```yaml
-cookies:
-  cache_ttl: 1800
-  sticky_ttl: 14400
-  qps: 0.8
-  download_qps: 1
-  sign_in_enabled: true
-  main_cookies:
-    - name: "主号"
-      enabled: true
-      cookie: ""
-  guest_cookies: []
-
-open_platform:
-  client_id: ""
-  client_secret: ""
-  redirect_uri: ""
-  accounts:
-    - name: ""
-      enabled: true
-      role: admin
-      refresh_token: ""
-      access_token: ""
-
-system:
-  host: ""
-
-emby:
-  url: ""
-  api_key: ""
-
-strm:
-  tasks:
-    - name: "每日更新"
-      enabled: true
-      path: "video/每日更新"
-      output_dir: "/data/strm/每日更新"
-      mode: "skip"
-      scan_method: "http_tree"
-      download_metadata: false
-      schedule: false
-      cron_expr: "0 */6 * * *"
-  api_delay_ms: 2000
-  cache_file: "/data/config/.strm_cache.json"
-
-organizer:
-  tmdb_api_key: ""
-  language: "zh-CN"
-  region: "CN"
-  tasks:
-    - name: "整理电影"
-      enabled: true
-      source_path: "video/待整理"
-      movie_dest_path: "video/电影"
-      tv_dest_path: "video/剧集"
-      driver_name: ""
-      schedule: false
-      dry_run: true
-
-upload:
-  tasks:
-    - name: "上传视频"
-      enabled: true
-      local_path: "/data/upload"
-      remote_path: "video/上传"
-      conflict_mode: "skip"
-      cookie_name: ""
-
-admin:
-  user: "admin"
-  password: "admin123"
-```
-
----
-
-## 环境变量
-
-| 变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `TZ` | `Asia/Shanghai` | 时区 |
-| `AUTO_GEN_CADDYFILE` | `true`（默认启用） | 设为 `false` 禁用自动生成 Caddyfile |
-
----
 
 ## 常见问题
 
@@ -268,9 +152,6 @@ Emby 管理面板 → 高级 → API 密钥 → 添加新密钥。
 
 在管理面板 → 账号管理 中点击「扫码获取」重新扫码。配置保存后自动热加载，无需重启服务。
 
-### 开放平台 Token 到期怎么办？
-
-系统会自动使用 refresh_token 刷新 access_token，无需手动操作。若 refresh_token 也已失效，管理面板会提示扫码重新登录。
 
 ### 如何更新？
 
