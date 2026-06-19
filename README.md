@@ -53,12 +53,14 @@ services:
     container_name: qmby
     restart: unless-stopped
     ports:
-      - "2083:2083"  # Caddy 代理端口
-      - "2084:2084"  # 管理面板端口
+      - "2083:2083"
+      - "2084:2084"
+    volumes:
+      - ./data:/data #qmby的配置文件路径
+      - ./strm:/strm #要生成strm文件的路径
+      - ./media:/media #本地媒体文件夹路径
     environment:
       - TZ=Asia/Shanghai
-    volumes:
-      - ./data:/data
 ```
 
 启动服务：
