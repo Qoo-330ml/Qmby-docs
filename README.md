@@ -186,6 +186,10 @@ docker compose up -d
 
 ![海雾微光组件预览](./plugin-ui/assets/sea-mist-components.png)
 
+## 插件开发
+
+第三方插件的仓库结构、`plugin.yaml`、`plugin-ui` 组件调用、Host API 和 README 写作规范见 [`plugin-development`](./plugin-development/)。
+
 ---
 
 ## 许可证
