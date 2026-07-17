@@ -1,26 +1,27 @@
 # Qmby 插件开发
 
-这份指南面向希望为 Qmby 开发第三方工具的开发者。插件由独立的 Go 可执行文件和一个可选的 React 配置页组成；Qmby 负责插件进程、配置代理、登录鉴权和 Host API 权限控制。
+这份指南面向希望为 Qmby 开发第三方工具的开发者。插件由独立的 Go 可执行文件组成；推荐使用 Qmby 原生 UI，由插件提供 Schema、状态和动作，Qmby 负责用自己的 React 组件渲染页面。只有需要完全自定义页面时，才使用兼容的 React 配置页。
 
 ## 先看这三份材料
 
 | 内容 | 位置 | 用途 |
 | --- | --- | --- |
-| UI 组件包 | [`../plugin-ui/`](../plugin-ui/) | React + TypeScript + Tailwind 4 的海雾微光组件 |
-| 组件 API | [`../plugin-ui/DESIGN_SYSTEM.md`](../plugin-ui/DESIGN_SYSTEM.md) | 组件、Token、状态和页面组合规范 |
+| 原生 UI 协议 | 本页「原生 UI」章节 | Schema、状态、动作和 Qmby 原生组件映射 |
+| UI 组件包 | [`../plugin-ui/`](../plugin-ui/) | 仅用于 `ui.type: iframe` 的 React + TypeScript + Tailwind 4 兼容页面 |
+| 组件 API | [`../plugin-ui/DESIGN_SYSTEM.md`](../plugin-ui/DESIGN_SYSTEM.md) | 兼容页面的组件、Token、状态和页面组合规范 |
 | Qmby 插件协议 | `qmby/v1` | 清单、进程接口、Host API 和发布要求 |
 
 ## 开发路线
 
-1. 准备插件仓库和 `plugin.yaml`。
+1. 准备插件仓库和 `plugin.yaml`，选择 `native` 或兼容的 `iframe` UI。
 2. 用 Go 实现插件进程，监听 `QMBY_PLUGIN_SOCKET`。
-3. 按需声明权限，并通过 `qmbyplugin` SDK 调用 Host API。
-4. 使用 `plugin-ui` 构建配置页面，并用相对路径访问插件接口。
+3. 原生 UI 实现 Schema、状态和动作接口；只有兼容模式才使用 `plugin-ui`。
+4. 按需声明权限，并通过 `qmbyplugin` SDK 调用 Host API。
 5. 写好插件 README，构建目标平台二进制并发布公开 Git 仓库。
 
 ## 1. 插件仓库
 
-推荐结构：
+推荐结构（原生 UI）：
 
 ```text
 qmby-example-plugin/
@@ -30,11 +31,10 @@ qmby-example-plugin/
 ├── bin/
 │   ├── plugin-linux-amd64
 │   └── plugin-linux-arm64
-└── web/
-    ├── index.html
-    ├── package.json
-    └── src/
+└── main_test.go
 ```
+
+使用 `ui.type: iframe` 时，再增加 `web/` 目录并通过 Go `embed` 打包页面资源。
 
 一个 Git 仓库可以只包含一个插件，也可以在 `plugins/<plugin_id>/` 下包含多个插件。Qmby 识别以下清单位置：
 
@@ -64,6 +64,7 @@ backend:
 
 ui:
   path: /v1/ui/
+  type: native
 
 permissions:
   - config.read
@@ -97,23 +98,27 @@ Qmby 启动插件时注入：
 go get github.com/Qoo-330ml/Qmby/pkg/qmbyplugin
 ```
 
-服务端骨架：
+服务端骨架（原生 UI）：
 
 ```go
 package main
 
 import (
-    "embed"
     "encoding/json"
-    "io/fs"
+    "io"
     "log"
     "net/http"
 
     "github.com/Qoo-330ml/Qmby/pkg/qmbyplugin"
 )
 
-//go:embed web/*
-var webFiles embed.FS
+type uiState struct {
+    ServerURL string `json:"server_url"`
+    Enabled   bool   `json:"enabled"`
+    Mode      string `json:"mode"`
+}
+
+var currentState = uiState{Mode: "incremental"}
 
 func main() {
     host, err := qmbyplugin.NewClientFromEnv()
@@ -125,21 +130,47 @@ func main() {
     mux.HandleFunc("GET /v1/health", func(w http.ResponseWriter, _ *http.Request) {
         writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
     })
-    mux.HandleFunc("GET /v1/status", func(w http.ResponseWriter, _ *http.Request) {
-        writeJSON(w, http.StatusOK, map[string]any{"running": false, "last_result": nil})
+    mux.HandleFunc("GET /v1/ui/schema", func(w http.ResponseWriter, _ *http.Request) {
+        writeJSON(w, http.StatusOK, map[string]any{
+            "version": "qmby/ui/v1",
+            "title": "示例工具",
+            "sections": []any{map[string]any{
+                "title": "基础配置",
+                "fields": []any{
+                    map[string]any{"key": "server_url", "label": "服务地址", "component": "input", "required": true},
+                    map[string]any{"key": "enabled", "label": "启用工具", "component": "switch", "default": true},
+                    map[string]any{"key": "mode", "label": "运行模式", "component": "select", "options": []any{
+                        map[string]string{"label": "增量", "value": "incremental"},
+                        map[string]string{"label": "全量", "value": "full"},
+                    }},
+                },
+            }},
+            "actions": []any{
+                map[string]string{"id": "save", "label": "保存配置", "kind": "save"},
+                map[string]string{"id": "run", "label": "立即执行", "kind": "command", "variant": "secondary"},
+            },
+        })
     })
-    mux.HandleFunc("POST /v1/run", func(w http.ResponseWriter, _ *http.Request) {
-        writeJSON(w, http.StatusAccepted, map[string]bool{"ok": true})
+    mux.HandleFunc("GET /v1/ui/state", func(w http.ResponseWriter, _ *http.Request) {
+        writeJSON(w, http.StatusOK, map[string]any{"data": currentState, "running": false})
     })
-    mux.HandleFunc("POST /v1/stop", func(w http.ResponseWriter, _ *http.Request) {
-        writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+    mux.HandleFunc("PUT /v1/ui/state", func(w http.ResponseWriter, r *http.Request) {
+        var request struct{ Data uiState `json:"data"` }
+        if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+            writeJSON(w, http.StatusBadRequest, map[string]any{"error": map[string]string{"code": "INVALID_JSON", "message": "请求格式错误"}})
+            return
+        }
+        currentState = request.Data
+        writeJSON(w, http.StatusOK, map[string]any{"data": currentState, "message": "配置已保存"})
     })
-
-    webRoot, err := fs.Sub(webFiles, "web")
-    if err != nil {
-        log.Fatal(err)
-    }
-    mux.Handle("/v1/ui/", http.StripPrefix("/v1/ui/", http.FileServer(http.FS(webRoot))))
+    mux.HandleFunc("POST /v1/ui/actions/{id}", func(w http.ResponseWriter, r *http.Request) {
+        _, _ = io.Copy(io.Discard, r.Body)
+        if r.PathValue("id") != "run" {
+            writeJSON(w, http.StatusNotFound, map[string]any{"error": map[string]string{"code": "NOT_FOUND", "message": "动作不存在"}})
+            return
+        }
+        writeJSON(w, http.StatusOK, map[string]any{"data": currentState, "message": "任务已开始"})
+    })
 
     _ = host
     log.Fatal(qmbyplugin.Serve(mux))
@@ -152,9 +183,9 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 }
 ```
 
-实际插件还应实现 `GET /v1/config`、`PUT /v1/config`、`GET /v1/status`、`POST /v1/run` 和 `POST /v1/stop`。`qmbyplugin.Serve` 负责在 Qmby 提供的 Socket 上启动服务并校验插件进程令牌。
+后台任务较复杂时，可以另外实现 `GET /v1/status`、`POST /v1/run` 和 `POST /v1/stop`，再在 UI Schema 中增加对应动作。使用原生 UI 时，插件页面不需要 `web/` 目录；使用兼容模式时，才需要通过 `embed` 提供页面资源。`qmbyplugin.Serve` 负责在 Qmby 提供的 Socket 上启动服务并校验插件进程令牌。
 
-标准响应格式：
+插件通用接口的标准响应格式：
 
 ```json
 {
@@ -175,11 +206,119 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 }
 ```
 
-## 4. 使用 UI 组件包
+## 4. 原生 UI（推荐）
 
-### 当前发布形态
+原生 UI 不使用 iframe，也不需要复制 `plugin-ui`。插件只提供 Schema、配置状态和动作，Qmby 使用自己的 React 组件渲染页面。
 
-`plugin-ui` 当前以本仓库中的源码目录发布，不是一个可以直接 `npm install @qmby/plugin-ui` 的 npm 包。开发插件时，把 [`plugin-ui`](../plugin-ui/) 目录复制到你的 React 项目中，或通过 Git 子模块引用它。
+清单中声明：
+
+```yaml
+ui:
+  type: native
+  path: /v1/ui/
+```
+
+插件进程提供以下接口：
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `GET` | `/v1/ui/schema` | 返回页面字段、分区和动作 |
+| `GET` | `/v1/ui/state` | 返回当前表单值和运行状态 |
+| `PUT` | `/v1/ui/state` | 保存表单值 |
+| `POST` | `/v1/ui/actions/<id>` | 执行一个插件动作 |
+
+Schema 版本固定为 `qmby/ui/v1`：
+
+```json
+{
+  "version": "qmby/ui/v1",
+  "title": "示例工具",
+  "description": "配置示例插件",
+  "sections": [
+    {
+      "title": "基础配置",
+      "fields": [
+        {
+          "key": "server_url",
+          "label": "服务地址",
+          "component": "input",
+          "required": true,
+          "placeholder": "https://example.com"
+        },
+        {
+          "key": "enabled",
+          "label": "启用工具",
+          "component": "switch",
+          "default": true
+        },
+        {
+          "key": "mode",
+          "label": "运行模式",
+          "component": "select",
+          "options": [
+            { "label": "增量", "value": "incremental" },
+            { "label": "全量", "value": "full" }
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": [
+    { "id": "save", "label": "保存配置", "kind": "save" },
+    { "id": "run", "label": "立即执行", "kind": "command", "variant": "secondary" }
+  ]
+}
+```
+
+当前支持的 `component` 有：`input`、`password`、`number`、`textarea`、`select` 和 `switch`。Qmby 会分别使用自己的 `Input`、`Textarea`、`Select`、`Switch` 和 `Button` 渲染。
+
+状态和保存请求：
+
+```json
+{
+  "data": {
+    "server_url": "https://example.com",
+    "enabled": true,
+    "mode": "incremental"
+  },
+  "running": false,
+  "message": "配置已保存"
+}
+```
+
+`PUT /v1/ui/state` 和 `POST /v1/ui/actions/<id>` 的请求体都是：
+
+```json
+{
+  "data": {
+    "server_url": "https://example.com"
+  }
+}
+```
+
+动作完成后返回最新状态。危险动作可以在 Schema 中增加 `confirm` 文案，Qmby 会在执行前确认。
+
+`ui.path` 是以上四个 endpoint 的共同前缀；例如声明 `/v1/settings/` 后，接口就是 `/v1/settings/schema` 和 `/v1/settings/state`。推荐固定使用 `/v1/ui/`，避免不必要的约定差异。
+
+原生 UI 的交互流程是：
+
+```text
+插件清单 → Qmby 工具卡片 → 原生 Dialog
+                              ↓
+              Qmby Input / Select / Switch / Button
+                              ↓
+                 插件 state / actions 接口
+```
+
+插件重启后，Qmby 会重新扫描插件目录、校验 `plugin.yaml`、启动 Go 二进制并检查 `/v1/health`。启动成功后，插件摘要会出现在「三方工具」页面；点击「配置」会打开 Qmby 原生 `Dialog`，随后由 Qmby 组件直接调用上述接口。整个过程没有 iframe，插件也不需要提供前端构建产物。
+
+## 5. 兼容模式：自定义 UI
+
+原生 UI 已经覆盖配置表单、状态和常见动作。需要完全自定义页面时，才使用 `ui.type: iframe`。
+
+### 当前组件包发布形态
+
+`plugin-ui` 当前以本仓库中的源码目录发布，不是一个可以直接 `npm install @qmby/plugin-ui` 的 npm 包。它只适用于 `ui.type: iframe` 的兼容模式；原生 UI 插件不需要复制它。
 
 组件包只负责视觉和交互，不负责业务请求。插件仍然需要自己实现配置、状态和任务接口。
 
@@ -281,9 +420,9 @@ function SaveButton() {
 
 完整组件列表、变体、Token 和页面组合规则见 [`plugin-ui/DESIGN_SYSTEM.md`](../plugin-ui/DESIGN_SYSTEM.md)。当前导出包括 `Button`、`Card`、`Dialog`、`Input`、`Label`、`Select`、`Textarea`、`Switch`、`Badge`、`AlertBanner`、`EmptyState`、`Skeleton`、`Separator`、`Tooltip`、`ToastProvider`、`FilterRow`、`SegmentedControl`、`Table` 和 `Pagination`。
 
-### 配置页请求插件接口
+### iframe 配置页请求插件接口
 
-配置页面运行在 sandbox iframe 中。页面请求插件自己的接口时，使用相对路径并携带 scoped cookie：
+iframe 页面运行在 sandbox 中。页面请求插件自己的接口时，使用相对路径并携带 scoped cookie：
 
 ```ts
 async function request(path: string, options: RequestInit = {}) {
@@ -309,7 +448,7 @@ await request("../config", {
 
 不要在浏览器代码中读取、拼接或记录 `QMBY_PLUGIN_TOKEN`。
 
-## 5. 调用 Host API
+## 6. 调用 Host API
 
 插件进程通过 SDK 创建客户端：
 
@@ -385,7 +524,7 @@ return host.SendNotification(ctx, qmbyplugin.NotificationMessage{
 })
 ```
 
-## 6. 插件文档怎么写
+## 7. 插件文档怎么写
 
 插件仓库至少包含一份 `README.md`，让用户不看源码也能完成安装、配置和排错。
 
@@ -428,7 +567,7 @@ return host.SendNotification(ctx, qmbyplugin.NotificationMessage{
 说明支持的平台、构建命令、版本和已知限制。
 ```
 
-## 7. 构建、安装和安全
+## 8. 构建、安装和安全
 
 构建 Linux 二进制：
 
@@ -443,8 +582,8 @@ CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
 
 - `plugin.yaml` 使用 `qmby/v1` 且字段完整。
 - 当前目标平台的二进制存在并且可执行。
-- 配置页已经由 Go `embed` 打包。
-- `/v1/health`、`/v1/status`、`/v1/run`、`/v1/stop` 可用。
+- `ui.type: native` 插件提供 `/v1/ui/schema`、`/v1/ui/state` 和动作接口；`ui.type: iframe` 插件的配置页已经由 Go `embed` 打包。
+- `/v1/health` 可用；如果插件声明后台任务，`/v1/status`、`/v1/run`、`/v1/stop` 也应可用。
 - 只声明实际使用的权限。
 - README 写清安装、配置、接口、构建和安全边界。
 - 不把令牌、Cookie 或密码写入日志、配置文件、前端代码或仓库。
