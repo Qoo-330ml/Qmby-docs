@@ -180,6 +180,10 @@ docker compose up -d
 - **前端**: React 19 + TypeScript + Vite 8 + Tailwind CSS 4 + Radix UI
 - **容器化**: Docker + Docker Compose + 多架构构建（amd64 / arm64）
 
+## UI 组件库
+
+海雾微光主题的可复用 React UI 组件、Token、调用示例和页面规范见 [`plugin-ui`](./plugin-ui/)。
+
 ---
 
 ## 许可证

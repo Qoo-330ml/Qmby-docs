@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: hsl(204 33% 97%);
+  --color-foreground: hsl(215 28% 14%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(215 25% 15%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(215 25% 15%);
+  --color-primary: hsl(199 88% 48%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(173 40% 94%);
+  --color-secondary-foreground: hsl(173 91% 25%);
+  --color-muted: hsl(205 24% 94%);
+  --color-muted-foreground: hsl(215 15% 45%);
+  --color-accent: hsl(199 80% 95%);
+  --color-accent-foreground: hsl(199 90% 30%);
+  --color-destructive: hsl(0 84% 60%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-success: hsl(101 60% 49%);
+  --color-success-foreground: hsl(0 0% 100%);
+  --color-info: hsl(173 91% 40%);
+  --color-info-foreground: hsl(0 0% 100%);
+  --color-warning: hsl(38 92% 50%);
+  --color-warning-foreground: hsl(0 0% 100%);
+  --color-border: transparent;
+  --color-input: transparent;
+  --color-ring: hsl(199 90% 50%);
+  --color-brand-blue: hsl(199 90% 50%);
+  --color-brand-teal: hsl(173 91% 40%);
+  --color-brand-green: hsl(101 60% 49%);
+  --radius: 0.75rem;
+}
+
+.dark {
+  --color-background: hsl(215 30% 8%);
+  --color-card: hsl(215 30% 11%);
+  --color-popover: hsl(215 30% 11%);
+  --color-primary: hsl(199 90% 55%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(173 30% 18%);
+  --color-secondary-foreground: hsl(173 60% 75%);
+  --color-muted: hsl(215 20% 16%);
+  --color-muted-foreground: hsl(215 15% 60%);
+  --color-foreground: var(--color-muted-foreground);
+  --color-card-foreground: var(--color-muted-foreground);
+  --color-popover-foreground: var(--color-muted-foreground);
+  --color-accent: hsl(199 40% 18%);
+  --color-accent-foreground: hsl(199 80% 75%);
+  --color-destructive: hsl(0 62% 50%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-success: hsl(101 55% 50%);
+  --color-success-foreground: hsl(0 0% 100%);
+  --color-info: hsl(173 80% 50%);
+  --color-info-foreground: hsl(0 0% 100%);
+  --color-warning: hsl(38 85% 55%);
+  --color-warning-foreground: hsl(0 0% 100%);
+  --color-ring: hsl(199 90% 55%);
+  --color-brand-blue: hsl(199 90% 55%);
+  --color-brand-teal: hsl(173 80% 50%);
+  --color-brand-green: hsl(101 55% 50%);
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  * {
+    border-color: var(--color-border);
+  }
+}
+
+:root {
+  --qmby-background-lights:
+    radial-gradient(circle at 14% 18%, hsl(199 88% 48% / 0.26), transparent 30rem),
+    radial-gradient(circle at 86% 30%, hsl(173 91% 40% / 0.22), transparent 28rem),
+    radial-gradient(circle at 42% 88%, hsl(40 93% 55% / 0.24), transparent 26rem);
+  --qmby-page-background: var(--qmby-background-lights), var(--color-background);
+}
+
+.dark {
+  --qmby-background-lights:
+    radial-gradient(circle at 14% 18%, hsl(199 90% 55% / 0.13), transparent 30rem),
+    radial-gradient(circle at 86% 30%, hsl(173 80% 50% / 0.11), transparent 28rem),
+    radial-gradient(circle at 42% 88%, hsl(42 90% 58% / 0.18), transparent 26rem);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--qmby-page-background);
+  background-attachment: fixed;
+  color: var(--color-foreground);
+  font-family: system-ui, -apple-system, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+[data-ui-slot="card"] [data-ui-slot="card"] {
+  background-color: color-mix(in srgb, var(--color-card) 72%, transparent);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 0.09);
+}
