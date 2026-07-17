@@ -184,6 +184,8 @@ docker compose up -d
 
 海雾微光主题的可复用 React UI 组件、Token、调用示例和页面规范见 [`plugin-ui`](./plugin-ui/)。
 
+![海雾微光组件预览](./plugin-ui/assets/sea-mist-components.png)
+
 ---
 
 ## 许可证

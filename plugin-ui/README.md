@@ -11,6 +11,12 @@ Qmby「海雾微光」主题的可复用 React + Tailwind UI 组件包。
 - Toast Context 与 Provider
 - 设计规范和页面组件抽取建议
 
+## 视觉预览
+
+下面的截图来自目录内真实组件源码，展示了海雾微光的常用控件、状态、表面和表格组合：
+
+![海雾微光组件总览](./assets/sea-mist-components.png)
+
 ## 目录
 
 ```text
